@@ -1,0 +1,1116 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>番茄时钟 · 小番茄</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Noto+Sans+SC:wght@300;500;700&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --tomato: #ff6347;
+    --tomato-light: #ff8a72;
+    --tomato-dark: #d94330;
+    --cream: #fff5f0;
+    --text-dark: #2d1b1b;
+    --ring-bg: rgba(255, 99, 71, 0.12);
+    --green: #4caf50;
+    --green-light: #81c784;
+    --green-dark: #388e3c;
+    --mint: #e8f5e9;
+    --mint-deep: #c8e6c9;
+  }
+
+  html, body {
+    height: 100%;
+    overflow: hidden;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+  }
+
+  body {
+    min-height: 100vh;
+    min-height: 100dvh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Noto Sans SC', sans-serif;
+    background: linear-gradient(135deg, #fff5f0 0%, #ffe8e0 40%, #ffd9cc 100%);
+    color: var(--text-dark);
+    transition: background 1.2s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* 绿色休息主题 */
+  body.rest-mode {
+    background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 40%, #a5d6a7 100%);
+  }
+
+  /* ===== 漂浮的背景气泡 ===== */
+  .bubble {
+    position: absolute;
+    border-radius: 50%;
+    background: radial-gradient(circle at 30% 30%, rgba(255,138,114,0.5), rgba(255,99,71,0.15));
+    animation: floatUp linear infinite;
+    pointer-events: none;
+    transition: background 1.2s ease;
+  }
+  body.rest-mode .bubble {
+    background: radial-gradient(circle at 30% 30%, rgba(129,199,132,0.5), rgba(76,175,80,0.18));
+  }
+  @keyframes floatUp {
+    0%   { transform: translateY(110vh) scale(0.4); opacity: 0; }
+    10%  { opacity: 0.7; }
+    90%  { opacity: 0.5; }
+    100% { transform: translateY(-15vh) scale(1.1); opacity: 0; }
+  }
+
+  /* 叶子 */
+  .leaf {
+    position: absolute;
+    pointer-events: none;
+    opacity: 0;
+    font-size: 28px;
+    animation: leafFall linear forwards;
+  }
+  @keyframes leafFall {
+    0%   { transform: translateY(-10vh) rotate(0deg) scale(0.5); opacity: 0; }
+    15%  { opacity: 0.8; }
+    85%  { opacity: 0.6; }
+    100% { transform: translateY(105vh) rotate(360deg) scale(1); opacity: 0; }
+  }
+
+  /* ===== 主容器 ===== */
+  .app {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 2;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    transition: opacity 0.5s ease, transform 0.5s ease;
+    width: 100%;
+    max-height: 100dvh;
+    padding: 20px;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .title {
+    font-size: 16px;
+    letter-spacing: 8px;
+    text-transform: uppercase;
+    color: var(--tomato-dark);
+    opacity: 0.6;
+    margin-bottom: -4px;
+    transition: color 0.8s ease, opacity 0.8s ease;
+  }
+
+  .subtitle {
+    font-size: 13px;
+    color: var(--tomato-dark);
+    opacity: 0.4;
+    letter-spacing: 2px;
+    margin-bottom: 24px;
+    transition: color 0.8s ease, opacity 0.8s ease;
+  }
+
+  /* ===== 时钟圆环 ===== */
+  .timer-wrap {
+    position: relative;
+    width: 340px;
+    height: 340px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .timer-wrap svg {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    transform: rotate(-90deg);
+  }
+
+  .ring-bg {
+    fill: none;
+    stroke: var(--ring-bg);
+    stroke-width: 14;
+  }
+
+  .ring-fg {
+    fill: none;
+    stroke: url(#grad);
+    stroke-width: 14;
+    stroke-linecap: round;
+    stroke-dasharray: 1005.31;
+    stroke-dashoffset: 0;
+    transition: stroke-dashoffset 0.95s cubic-bezier(0.4, 0, 0.2, 1);
+    filter: drop-shadow(0 0 8px rgba(255,99,71,0.35));
+  }
+
+  /* 呼吸光晕 */
+  .glow {
+    position: absolute;
+    width: 300px; height: 300px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(255,99,71,0.15), transparent 65%);
+    animation: breathe 4s ease-in-out infinite;
+    pointer-events: none;
+  }
+  @keyframes breathe {
+    0%, 100% { transform: scale(0.85); opacity: 0.5; }
+    50%      { transform: scale(1.08); opacity: 0.9; }
+  }
+
+  .glow.running {
+    animation: breathe 1.5s ease-in-out infinite;
+  }
+
+  /* ===== 时间显示 ===== */
+  .time-display {
+    position: relative;
+    z-index: 1;
+    font-family: 'Orbitron', monospace;
+    font-size: 82px;
+    font-weight: 900;
+    letter-spacing: 4px;
+    color: var(--text-dark);
+    text-shadow: 0 2px 20px rgba(255,99,71,0.2);
+    line-height: 1;
+    transition: transform 0.3s ease, color 0.3s ease;
+  }
+
+  .time-display .colon {
+    display: inline-block;
+    color: var(--tomato);
+    animation: none;
+    margin: 0 2px;
+  }
+
+  .time-display.running .colon {
+    animation: blink 1s ease-in-out infinite;
+  }
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50%      { opacity: 0.25; }
+  }
+
+  .digit-flip {
+    display: inline-block;
+    animation: flipIn 0.4s ease;
+  }
+  @keyframes flipIn {
+    0%   { transform: rotateX(90deg); opacity: 0; }
+    100% { transform: rotateX(0deg); opacity: 1; }
+  }
+
+  .status {
+    font-size: 13px;
+    letter-spacing: 6px;
+    color: var(--tomato-dark);
+    opacity: 0.5;
+    height: 18px;
+    transition: opacity 0.3s ease, color 0.8s ease;
+  }
+
+  /* ===== 任务栏 ===== */
+  .task-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: rgba(255,255,255,0.65);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-radius: 50px;
+    padding: 10px 20px;
+    border: 1.5px solid rgba(255,99,71,0.15);
+    box-shadow: 0 2px 12px rgba(0,0,0,0.04);
+    transition: border-color 0.4s ease, box-shadow 0.3s ease, background 0.4s ease;
+    width: 280px;
+  }
+
+  .task-bar:focus-within {
+    border-color: rgba(255,99,71,0.4);
+    box-shadow: 0 4px 20px rgba(255,99,71,0.12);
+    background: rgba(255,255,255,0.85);
+  }
+
+  .task-icon {
+    font-size: 18px;
+    line-height: 1;
+    flex-shrink: 0;
+    opacity: 0.5;
+    cursor: pointer;
+    transition: opacity 0.3s ease, transform 0.2s ease;
+    user-select: none;
+  }
+  .task-icon:hover {
+    transform: scale(1.25);
+    opacity: 0.8;
+  }
+  .task-icon:active {
+    transform: scale(0.9);
+  }
+
+  /* 高亮选中态 */
+  .task-bar.highlighted {
+    border-color: rgba(255,99,71,0.6);
+    background: rgba(255,99,71,0.08);
+    box-shadow: 0 0 0 3px rgba(255,99,71,0.12), 0 4px 20px rgba(255,99,71,0.2);
+    animation: highlightPulse 2s ease-in-out infinite;
+  }
+  @keyframes highlightPulse {
+    0%, 100% { box-shadow: 0 0 0 3px rgba(255,99,71,0.12), 0 4px 20px rgba(255,99,71,0.2); }
+    50%      { box-shadow: 0 0 0 6px rgba(255,99,71,0.18), 0 6px 28px rgba(255,99,71,0.3); }
+  }
+  .task-bar.highlighted .task-icon {
+    opacity: 1;
+    color: var(--tomato);
+    animation: pinBounce 0.5s ease;
+  }
+  @keyframes pinBounce {
+    0%   { transform: scale(1); }
+    30%  { transform: scale(1.4) rotate(-15deg); }
+    60%  { transform: scale(0.95) rotate(8deg); }
+    100% { transform: scale(1) rotate(0deg); }
+  }
+
+  .task-input {
+    flex: 1;
+    border: none;
+    background: transparent;
+    font-family: 'Noto Sans SC', sans-serif;
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--text-dark);
+    outline: none;
+    min-width: 0;
+  }
+  .task-input::placeholder {
+    color: rgba(45,27,27,0.25);
+    font-weight: 300;
+  }
+
+  .task-clear {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 14px;
+    line-height: 1;
+    color: rgba(45,27,27,0.25);
+    flex-shrink: 0;
+    padding: 2px;
+    opacity: 0;
+    transition: opacity 0.2s ease, color 0.2s ease;
+  }
+  .task-bar:hover .task-clear,
+  .task-bar:focus-within .task-clear {
+    opacity: 1;
+  }
+  .task-clear:hover {
+    color: var(--tomato);
+  }
+
+  /* ===== 按钮 ===== */
+  .btn {
+    margin-top: 24px;
+    padding: 16px 56px;
+    font-size: 18px;
+    font-weight: 700;
+    font-family: 'Noto Sans SC', sans-serif;
+    letter-spacing: 6px;
+    color: #fff;
+    background: linear-gradient(135deg, var(--tomato), var(--tomato-dark));
+    border: none;
+    border-radius: 50px;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+    box-shadow: 0 8px 24px rgba(255,99,71,0.4);
+    transition: transform 0.2s ease, box-shadow 0.3s ease;
+  }
+
+  .btn:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 12px 32px rgba(255,99,71,0.5);
+  }
+
+  .btn:active {
+    transform: translateY(0) scale(0.97);
+  }
+
+  .btn .ripple {
+    position: absolute;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.4);
+    transform: scale(0);
+    animation: ripple 0.6s ease-out;
+    pointer-events: none;
+  }
+  @keyframes ripple {
+    to { transform: scale(4); opacity: 0; }
+  }
+
+  .btn-label {
+    display: inline-block;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+  }
+  .btn-label.swap-out {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+
+  .btn.stop-mode {
+    background: linear-gradient(135deg, var(--tomato-light), var(--tomato));
+  }
+
+  /* ===== 完成时的弹跳动画 ===== */
+  .timer-wrap.done .time-display {
+    animation: doneBounce 0.6s ease;
+    color: var(--tomato-dark);
+  }
+  @keyframes doneBounce {
+    0%   { transform: scale(1); }
+    30%  { transform: scale(1.15); }
+    60%  { transform: scale(0.95); }
+    100% { transform: scale(1); }
+  }
+
+  .pulse-ring {
+    position: absolute;
+    width: 320px; height: 320px;
+    border-radius: 50%;
+    border: 3px solid var(--tomato);
+    opacity: 0;
+    pointer-events: none;
+  }
+  .pulse-ring.active {
+    animation: pulseExpand 1.2s ease-out;
+  }
+  @keyframes pulseExpand {
+    0%   { transform: scale(0.7); opacity: 0.8; }
+    100% { transform: scale(1.5); opacity: 0; }
+  }
+
+  .footer {
+    margin-top: 16px;
+    font-size: 12px;
+    color: var(--tomato-dark);
+    opacity: 0.35;
+    letter-spacing: 1px;
+  }
+
+  /* ===== 理念按钮 ===== */
+  .phil-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-family: 'Noto Sans SC', sans-serif;
+    font-size: 12px;
+    letter-spacing: 4px;
+    color: var(--tomato-dark);
+    opacity: 0.3;
+    padding: 6px 12px;
+    margin-top: 6px;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+  }
+  .phil-btn:hover {
+    opacity: 0.55;
+    transform: translateY(-1px);
+  }
+
+  /* ===== 理念弹窗 ===== */
+  .phil-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    background: rgba(45, 27, 27, 0.35);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.4s ease;
+  }
+  .phil-overlay.active {
+    pointer-events: all;
+    opacity: 1;
+  }
+
+  .phil-card {
+    background: rgba(255, 245, 240, 0.92);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border-radius: 28px;
+    padding: 40px 44px 36px;
+    max-width: 500px;
+    width: 90%;
+    position: relative;
+    border: 1.5px solid rgba(255, 99, 71, 0.15);
+    box-shadow: 0 20px 60px rgba(255, 99, 71, 0.15), 0 4px 16px rgba(0,0,0,0.06);
+    transform: translateY(20px) scale(0.95);
+    transition: transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+  .phil-overlay.active .phil-card {
+    transform: translateY(0) scale(1);
+  }
+
+  .phil-close {
+    position: absolute;
+    top: 16px;
+    right: 20px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 18px;
+    color: var(--tomato-dark);
+    opacity: 0.35;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    line-height: 1;
+  }
+  .phil-close:hover {
+    opacity: 0.65;
+    transform: rotate(90deg);
+  }
+
+  .phil-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--tomato-dark);
+    letter-spacing: 5px;
+    margin-bottom: 22px;
+    text-align: center;
+  }
+
+  .phil-list {
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 0;
+  }
+
+  .phil-list li {
+    font-size: 13px;
+    color: var(--text-dark);
+    opacity: 0.55;
+    line-height: 1.75;
+    padding-left: 20px;
+    position: relative;
+    letter-spacing: 0.3px;
+  }
+
+  .phil-list li::before {
+    content: '·';
+    position: absolute;
+    left: 4px;
+    color: var(--tomato);
+    opacity: 0.5;
+    font-weight: 700;
+    font-size: 16px;
+    line-height: 1.7;
+  }
+
+  /* ===== 休息叠加层 ===== */
+  .rest-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.8s ease;
+  }
+
+  .rest-overlay.active {
+    pointer-events: all;
+    opacity: 1;
+  }
+
+  .rest-card {
+    background: rgba(255,255,255,0.7);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border-radius: 32px;
+    padding: 48px 52px;
+    text-align: center;
+    box-shadow: 0 20px 60px rgba(76,175,80,0.2), 0 2px 12px rgba(0,0,0,0.04);
+    border: 2px solid rgba(129,199,132,0.3);
+    transform: translateY(30px) scale(0.9);
+    transition: transform 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+    max-width: 400px;
+  }
+
+  .rest-overlay.active .rest-card {
+    transform: translateY(0) scale(1);
+  }
+
+  .rest-emoji {
+    font-size: 72px;
+    line-height: 1;
+    animation: restFloat 2.5s ease-in-out infinite;
+    display: block;
+  }
+  @keyframes restFloat {
+    0%, 100% { transform: translateY(0); }
+    50%      { transform: translateY(-12px); }
+  }
+
+  .rest-message {
+    font-family: 'Noto Sans SC', sans-serif;
+    font-size: 26px;
+    font-weight: 700;
+    color: var(--green-dark);
+    margin-top: 20px;
+    letter-spacing: 2px;
+    line-height: 1.6;
+  }
+
+  .rest-sub {
+    font-size: 14px;
+    color: var(--green-dark);
+    opacity: 0.55;
+    margin-top: 8px;
+    letter-spacing: 1px;
+  }
+
+  .rest-task {
+    display: inline-block;
+    margin-top: 16px;
+    padding: 6px 20px;
+    background: rgba(129,199,132,0.2);
+    border-radius: 50px;
+    font-size: 13px;
+    color: var(--green-dark);
+    opacity: 0.8;
+    letter-spacing: 1px;
+  }
+
+  .rest-actions {
+    margin-top: 32px;
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+
+  .rest-btn {
+    padding: 12px 32px;
+    border-radius: 50px;
+    border: none;
+    cursor: pointer;
+    font-family: 'Noto Sans SC', sans-serif;
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: 3px;
+    transition: transform 0.2s ease, box-shadow 0.3s ease;
+  }
+
+  .rest-btn.primary {
+    background: linear-gradient(135deg, var(--green), var(--green-dark));
+    color: #fff;
+    box-shadow: 0 6px 20px rgba(76,175,80,0.4);
+  }
+  .rest-btn.primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 28px rgba(76,175,80,0.5);
+  }
+
+  .rest-btn.secondary {
+    background: rgba(129,199,132,0.2);
+    color: var(--green-dark);
+  }
+  .rest-btn.secondary:hover {
+    transform: translateY(-2px);
+    background: rgba(129,199,132,0.35);
+  }
+
+  /* 响应式 */
+  @media (max-width: 480px) {
+    .timer-wrap { width: 280px; height: 280px; }
+    .time-display { font-size: 64px; }
+    .glow { width: 250px; height: 250px; }
+    .pulse-ring { width: 260px; height: 260px; }
+    .task-bar { width: 240px; }
+    .rest-card { padding: 36px 28px; margin: 0 16px; }
+    .rest-emoji { font-size: 56px; }
+    .rest-message { font-size: 22px; }
+  }
+</style>
+</head>
+<body>
+
+  <!-- 背景气泡容器 -->
+  <div id="bubbles"></div>
+
+  <div class="app" id="app">
+    <div class="title">小番茄</div>
+    <div class="subtitle">番茄工作法 · 专注 30 分钟</div>
+
+    <div class="timer-wrap" id="timerWrap">
+      <div class="glow" id="glow"></div>
+      <div class="pulse-ring" id="pulseRing"></div>
+      <svg viewBox="0 0 340 340">
+        <defs>
+          <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="#ff8a72"/>
+            <stop offset="100%" stop-color="#d94330"/>
+          </linearGradient>
+        </defs>
+        <circle class="ring-bg" cx="170" cy="170" r="160"/>
+        <circle class="ring-fg" id="ringFg" cx="170" cy="170" r="160"/>
+      </svg>
+      <div class="time-display" id="display">
+        <span id="hh">00</span><span class="colon">:</span><span id="mm">30</span>
+      </div>
+    </div>
+
+    <div class="status" id="status">就绪</div>
+
+    <!-- 任务栏 -->
+    <div class="task-bar" id="taskBar">
+      <span class="task-icon" id="taskPin" title="高亮此任务">📌</span>
+      <input class="task-input" id="taskInput" type="text" placeholder="添加任务 1…" maxlength="40" autocomplete="off">
+      <button class="task-clear" id="taskClear" title="清空任务">✕</button>
+    </div>
+    <div class="task-bar" id="taskBar2">
+      <span class="task-icon" id="taskPin2" title="高亮此任务">📌</span>
+      <input class="task-input" id="taskInput2" type="text" placeholder="添加任务 2…" maxlength="40" autocomplete="off">
+      <button class="task-clear" id="taskClear2" title="清空任务">✕</button>
+    </div>
+    <div class="task-bar" id="taskBar3">
+      <span class="task-icon" id="taskPin3" title="高亮此任务">📌</span>
+      <input class="task-input" id="taskInput3" type="text" placeholder="添加任务 3…" maxlength="40" autocomplete="off">
+      <button class="task-clear" id="taskClear3" title="清空任务">✕</button>
+    </div>
+
+    <button class="btn" id="btn">
+      <span class="btn-label" id="btnLabel">开始</span>
+    </button>
+
+    <button class="phil-btn" id="philBtn">理念</button>
+  </div>
+
+  <!-- 产品理念弹窗 -->
+  <div class="phil-overlay" id="philOverlay">
+    <div class="phil-card" id="philCard">
+      <button class="phil-close" id="philClose">✕</button>
+      <div class="phil-title">产品理念</div>
+      <ol class="phil-list">
+        <li>左为轮次 · 右为分钟 · 每轮 30 分钟</li>
+        <li>只显示30分钟，不支持自定义时间，因为休息就该好好休息，30分钟更像完整的数字</li>
+        <li>一天专注完成3个任务就已经很棒了</li>
+        <li>点击任务左侧图标可高亮当前任务，再点击"取消"</li>
+        <li>专注30分钟，不支持暂停，每次点击都是重新开始</li>
+        <li>没有日/周记录报表，任务本身就是最好的正反馈，尽量把视线放在任务本身哦</li>
+        <li>只设置了开始提示音，没有环境音，尽量减少干扰</li>
+        <li>没有任务备注跟细分</li>
+      </ol>
+    </div>
+  </div>
+
+  <!-- 休息叠加层 -->
+  <div class="rest-overlay" id="restOverlay">
+    <div class="rest-card">
+      <span class="rest-emoji">💧</span>
+      <div class="rest-message">现在起身喝杯水</div>
+      <div class="rest-sub">休息一下，补充水分</div>
+      <div class="rest-task" id="restTaskLabel"></div>
+      <div class="rest-actions">
+        <button class="rest-btn primary" id="restReturn">重新开始</button>
+        <button class="rest-btn secondary" id="restClose">稍后</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+(function () {
+  // ===== 配置 =====
+  const TOTAL_MINUTES = 30;
+  const CIRCUMFERENCE = 2 * Math.PI * 160;
+
+  // ===== DOM =====
+  const display     = document.getElementById('display');
+  const hhEl        = document.getElementById('hh');
+  const mmEl        = document.getElementById('mm');
+  const ringFg      = document.getElementById('ringFg');
+  const btn         = document.getElementById('btn');
+  const btnLabel    = document.getElementById('btnLabel');
+  const statusEl    = document.getElementById('status');
+  const glow        = document.getElementById('glow');
+  const timerWrap   = document.getElementById('timerWrap');
+  const pulseRing   = document.getElementById('pulseRing');
+  const app         = document.getElementById('app');
+  const taskInput   = document.getElementById('taskInput');
+  const taskClear   = document.getElementById('taskClear');
+  const taskInput2  = document.getElementById('taskInput2');
+  const taskClear2  = document.getElementById('taskClear2');
+  const taskInput3  = document.getElementById('taskInput3');
+  const taskClear3  = document.getElementById('taskClear3');
+  const taskBars    = [
+    document.getElementById('taskBar'),
+    document.getElementById('taskBar2'),
+    document.getElementById('taskBar3')
+  ];
+  const taskPins    = [
+    document.getElementById('taskPin'),
+    document.getElementById('taskPin2'),
+    document.getElementById('taskPin3')
+  ];
+  const restOverlay = document.getElementById('restOverlay');
+  const restTaskLabel = document.getElementById('restTaskLabel');
+  const restReturn  = document.getElementById('restReturn');
+  const restClose   = document.getElementById('restClose');
+  const philOverlay = document.getElementById('philOverlay');
+  const philBtn     = document.getElementById('philBtn');
+  const philClose   = document.getElementById('philClose');
+  const body        = document.body;
+
+  // ===== 状态 =====
+  let isRunning   = false;
+  let remaining   = TOTAL_MINUTES * 60;
+  let intervalId  = null;
+  let inRest      = false;
+  let cycleCount  = 0; // 已完成的轮次
+
+  // ===== 初始化圆环 =====
+  ringFg.style.strokeDasharray  = CIRCUMFERENCE;
+  ringFg.style.strokeDashoffset = 0;
+
+  // ===== 更新显示 =====
+  let lastHh = '00', lastMm = '30';
+  function render() {
+    const m = Math.ceil(remaining / 60);
+    const hStr = String(cycleCount).padStart(2, '0');
+    const mStr = String(m).padStart(2, '0');
+
+    if (hStr !== lastHh) {
+      hhEl.textContent = hStr;
+      hhEl.classList.remove('digit-flip');
+      void hhEl.offsetWidth;
+      hhEl.classList.add('digit-flip');
+      lastHh = hStr;
+    }
+    if (mStr !== lastMm) {
+      mmEl.textContent = mStr;
+      mmEl.classList.remove('digit-flip');
+      void mmEl.offsetWidth;
+      mmEl.classList.add('digit-flip');
+      lastMm = mStr;
+    }
+
+    const elapsed = TOTAL_MINUTES * 60 - remaining;
+    const progress = elapsed / (TOTAL_MINUTES * 60);
+    ringFg.style.strokeDashoffset = CIRCUMFERENCE * progress;
+  }
+
+  // ===== 切换按钮文字 =====
+  function setLabel(text) {
+    btnLabel.classList.add('swap-out');
+    setTimeout(() => {
+      btnLabel.textContent = text;
+      btnLabel.classList.remove('swap-out');
+    }, 200);
+  }
+
+  // ===== 开始 =====
+  function start() {
+    remaining = TOTAL_MINUTES * 60;
+    isRunning = true;
+    display.classList.add('running');
+    glow.classList.add('running');
+    btn.classList.remove('stop-mode');
+    setLabel('停止');
+    statusEl.textContent = '专注中…';
+    statusEl.style.opacity = '0.7';
+    render();
+
+    // 开始音效（上行琶音）
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      [0, 0.08, 0.16].forEach((delay, i) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.frequency.value = [440, 554, 659][i]; // A4 C#5 E5
+        osc.type = 'sine';
+        const t = ctx.currentTime + delay;
+        gain.gain.setValueAtTime(0.0001, t);
+        gain.gain.exponentialRampToValueAtTime(0.2, t + 0.03);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.2);
+        osc.start(t);
+        osc.stop(t + 0.2);
+      });
+    } catch (e) { /* 静默 */ }
+
+    intervalId = setInterval(() => {
+      remaining -= 1;
+      if (remaining <= 0) {
+        remaining = 0;
+        render();
+        finish();
+        return;
+      }
+      render();
+    }, 1000);
+  }
+
+  // ===== 停止 =====
+  function stop() {
+    isRunning = false;
+    clearInterval(intervalId);
+    intervalId = null;
+    display.classList.remove('running');
+    glow.classList.remove('running');
+    btn.classList.remove('stop-mode');
+    setLabel('开始');
+    statusEl.textContent = '已停止';
+    statusEl.style.opacity = '0.5';
+    remaining = TOTAL_MINUTES * 60;
+    render();
+  }
+
+  // ===== 完成 =====
+  function finish() {
+    clearInterval(intervalId);
+    intervalId = null;
+    isRunning = false;
+    display.classList.remove('running');
+    glow.classList.remove('running');
+    setLabel('开始');
+    statusEl.textContent = '完成！';
+    statusEl.style.opacity = '0.9';
+
+    timerWrap.classList.add('done');
+    pulseRing.classList.remove('active');
+    void pulseRing.offsetWidth;
+    pulseRing.classList.add('active');
+    setTimeout(() => timerWrap.classList.remove('done'), 600);
+
+    // 轮次 +1
+    cycleCount++;
+
+    // 显示休息页面
+    showRestPage();
+  }
+
+  // ===== 休息页面 =====
+  function showRestPage() {
+    inRest = true;
+
+    // 显示轮次
+    restTaskLabel.textContent = '第 ' + cycleCount + ' 轮完成';
+    restTaskLabel.style.display = 'inline-block';
+
+    // 绿色主题
+    body.classList.add('rest-mode');
+
+    // 生成叶子
+    spawnLeaves();
+
+    // 显示叠加层
+    restOverlay.classList.add('active');
+
+    // 隐藏主应用
+    app.style.opacity = '0';
+  }
+
+  function hideRestPage() {
+    inRest = false;
+    body.classList.remove('rest-mode');
+    restOverlay.classList.remove('active');
+
+    // 移除叶子
+    document.querySelectorAll('.leaf').forEach(l => l.remove());
+
+    app.style.opacity = '1';
+
+    // 重置计时器
+    remaining = TOTAL_MINUTES * 60;
+    statusEl.textContent = '就绪';
+    statusEl.style.opacity = '0.5';
+    render();
+  }
+
+  // ===== 叶子掉落 =====
+  function spawnLeaves() {
+    const leafChars = ['🍃', '🌿', '🌱', '🍀', '💚'];
+    const count = 14;
+    for (let i = 0; i < count; i++) {
+      const leaf = document.createElement('div');
+      leaf.className = 'leaf';
+      leaf.textContent = leafChars[Math.floor(Math.random() * leafChars.length)];
+      leaf.style.left = Math.random() * 94 + 'vw';
+      leaf.style.fontSize = (20 + Math.random() * 28) + 'px';
+      leaf.style.animationDuration = (6 + Math.random() * 8) + 's';
+      leaf.style.animationDelay = (Math.random() * 2) + 's';
+      document.body.appendChild(leaf);
+
+      // 循环叶子
+      const dur = 6000 + Math.random() * 8000;
+      const loop = () => {
+        leaf.style.animation = 'none';
+        void leaf.offsetWidth;
+        leaf.style.left = Math.random() * 94 + 'vw';
+        leaf.style.animation = `leafFall ${dur}ms linear forwards`;
+      };
+      const interval = setInterval(loop, dur + 500);
+      leaf._interval = interval;
+      leaf._loop = loop;
+    }
+  }
+
+  // ===== 休息层按钮 =====
+  restReturn.addEventListener('click', () => {
+    hideRestPage();
+    start(); // 直接开始新一轮
+  });
+
+  restClose.addEventListener('click', () => {
+    hideRestPage();
+  });
+
+  // ===== 理念弹窗 =====
+  philBtn.addEventListener('click', () => {
+    philOverlay.classList.add('active');
+  });
+
+  philClose.addEventListener('click', () => {
+    philOverlay.classList.remove('active');
+  });
+
+  philOverlay.addEventListener('click', (e) => {
+    if (e.target === philOverlay) {
+      philOverlay.classList.remove('active');
+    }
+  });
+
+  // ===== 任务栏交互 =====
+  function setupTaskBar(inputEl, clearEl) {
+    clearEl.addEventListener('click', () => {
+      inputEl.value = '';
+      inputEl.focus();
+    });
+    inputEl.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        inputEl.blur();
+      }
+    });
+    // 键盘收起后恢复布局
+    inputEl.addEventListener('blur', () => {
+      [50, 150, 300, 500].forEach(delay => {
+        setTimeout(() => {
+          window.scrollTo(0, 0);
+          if (document.body) document.body.scrollTop = 0;
+          if (document.documentElement) document.documentElement.scrollTop = 0;
+        }, delay);
+      });
+    });
+  }
+  setupTaskBar(taskInput,  taskClear);
+  setupTaskBar(taskInput2, taskClear2);
+  setupTaskBar(taskInput3, taskClear3);
+
+  // ===== 图钉高亮（互斥单选） =====
+  let highlightedIndex = -1; // -1 表示无高亮
+  taskPins.forEach((pin, idx) => {
+    pin.addEventListener('click', () => {
+      if (highlightedIndex === idx) {
+        // 再次点击同一个 → 取消高亮
+        taskBars[idx].classList.remove('highlighted');
+        highlightedIndex = -1;
+      } else {
+        // 先清除其他高亮
+        if (highlightedIndex >= 0) {
+          taskBars[highlightedIndex].classList.remove('highlighted');
+        }
+        // 高亮当前项
+        taskBars[idx].classList.add('highlighted');
+        highlightedIndex = idx;
+      }
+    });
+  });
+
+  // ===== 按钮点击 =====
+  btn.addEventListener('click', function (e) {
+    if (inRest) return;
+
+    const rect = btn.getBoundingClientRect();
+    const ripple = document.createElement('span');
+    ripple.className = 'ripple';
+    const size = Math.max(rect.width, rect.height);
+    ripple.style.width = ripple.style.height = size + 'px';
+    ripple.style.left = (e.clientX - rect.left - size / 2) + 'px';
+    ripple.style.top  = (e.clientY - rect.top  - size / 2) + 'px';
+    btn.appendChild(ripple);
+    setTimeout(() => ripple.remove(), 600);
+
+    if (isRunning) {
+      stop();
+    } else {
+      start();
+    }
+  });
+
+  // ===== 生成背景气泡 =====
+  const bubbleContainer = document.getElementById('bubbles');
+  function createBubbles() {
+    const count = 18;
+    for (let i = 0; i < count; i++) {
+      const b = document.createElement('div');
+      b.className = 'bubble';
+      const size = 20 + Math.random() * 70;
+      b.style.width = size + 'px';
+      b.style.height = size + 'px';
+      b.style.left = Math.random() * 100 + 'vw';
+      b.style.animationDuration = (10 + Math.random() * 15) + 's';
+      b.style.animationDelay = (Math.random() * 15) + 's';
+      bubbleContainer.appendChild(b);
+    }
+  }
+  createBubbles();
+
+  // ===== 调试：双击时间跳转到最后 5 秒 =====
+  display.addEventListener('dblclick', (e) => {
+    e.preventDefault();
+    if (!isRunning) return; // 只在运行时有效
+    remaining = 5; // 跳到只剩 5 秒
+    render();
+  });
+
+  // 初始渲染
+  render();
+
+  // ===== 移动端键盘收起后恢复布局 =====
+  function resetLayout() {
+    window.scrollTo(0, 0);
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+  }
+
+  [taskInput, taskInput2, taskInput3].forEach(inputEl => {
+    inputEl.addEventListener('blur', () => {
+      [0, 100, 300, 500].forEach(d => setTimeout(resetLayout, d));
+    });
+  });
+
+  document.addEventListener('focusout', () => {
+    [0, 100, 300, 500].forEach(d => setTimeout(resetLayout, d));
+  });
+})();
+</script>
+</body>
+</html>
